@@ -1,0 +1,276 @@
+#!/bin/bash
+# A ToDo tool written for bash shell
+
+# Delimiter between title and description of a todo
+name_desc_delim="$"
+
+# Delimiter between two todo tasks
+todo_delim="&"
+
+# File used to maintain todos
+todo_file="/home/mrinalmriyo/.todotasks"
+
+# Function to add a todo to the list
+add_todo()
+{
+	# If no description is provided set the description to <No description added>
+	todo_title="$1"
+	if [ $# -eq 2 ]
+	then
+		todo_desc="$2"
+	else
+		todo_desc="<No description added>"
+	fi
+
+	# If todo file exists, read it and check if a todo with same title already exists, set todo_exists to 1 if
+	# a todo with same title is found
+	todo_exists=0
+       	if [ -e $todo_file ]
+	then
+		todos=$(<$todo_file)
+
+		# IFS used for separating file using delimiter
+        	IFS=$todo_delim read -ra all_todos <<< "$todos"
+        	for i in "${all_todos[@]}"; do
+			IFS=$name_desc_delim read -ra todo <<< "$i"
+                        for((j=0; j<${#todo[*]}; j=j+2))
+                        do
+                                if [ "${todo[j]}" = "$1" ]
+                                then
+                                        todo_exists=1
+					break;
+                                fi
+                        done
+		done
+        fi
+
+	# If a todo with same title exists, prompt the user, else add it to the list
+        if [ $todo_exists -eq 1 ]
+        then
+		echo -e "\e[1;31mA todo with the same title already exists!\e[0m"
+        else
+                echo -e "\e[1;32mTodo added!\e[0m"
+                printf "%s%s%s%s" "$todo_title$name_desc_delim$todo_desc$todo_delim" >> $todo_file
+        fi
+}
+
+# Function to display title(s) of all the todos in the list
+list_todos()
+{
+	# Check if the todo file exists
+	if [ ! -e $todo_file ]
+	then
+		echo -e "\e[1;37mNo todos available!"
+		return
+	fi
+
+	# Display titles of all the todos
+	echo -e "\e[1;34mList of Todos\e[0m"
+	todos=$(<$todo_file)
+	IFS="$todo_delim" read -ra all_todos <<< "$todos"
+	for i in "${all_todos[@]}"; do
+		IFS="$name_desc_delim" read -ra todo <<< "$i"
+		for((j=0; j<${#todo[*]}; j=j+2))
+		do
+			echo "${todo[j]}"	
+		done
+	done	
+}
+
+# Function to read description of a todo by its title, -a to read description of all the todos
+read_todo()
+{
+	# Check if the file exists
+	if [ ! -e $todo_file ]
+	then
+		echo -e "\e[1;37mNo todos available!"
+		return
+	fi
+	todo_found=0
+	todos=$(<$todo_file)
+        IFS=$todo_delim read -ra all_todos <<< "$todos"
+        for i in "${all_todos[@]}"; do
+                IFS=$name_desc_delim read -ra todo <<< "$i"
+		for((j=0; j<${#todo[*]}; j=j+2))
+		do
+			# If -a option is set, display description of all the todos else display description
+			# of only that todo whose title is provided
+			if [ $# -eq 0 ]
+			then
+				todo_found=1
+				echo -e "\e[1;34mDescription of ${todo[j]}\e[0m"
+				echo "${todo[j + 1]}"
+                       	elif [ "${todo[j]}" = "$1" ]
+                       	then
+				todo_found=1
+				echo -e "\e[1;34mDescription of $1\e[0m"
+				echo "${todo[j + 1]}"
+				break;
+                       	fi
+		done
+        done
+
+	# If no todo found prompt the user
+	if [ $todo_found -eq 0 ]
+	then
+		echo -e "\e[1;31mNo todo found with given title!\e[0m"
+	fi
+}
+
+# Remove a todo with the title provided
+remove_todo()
+{
+	# Check if the file exists
+	if [ ! -e $todo_file ]
+	then
+		echo -e "\e[1;37mNo todos available!"
+		return
+	fi
+
+	# Check if a todo with same title exists, if yes, remove it by writing all other todos to a separate file
+	# and skipping the todo whose title is provided
+	todo_exists=0
+	todos=$(<$todo_file)
+        IFS=$todo_delim read -ra all_todos <<< "$todos"
+	rm $todo_file
+	temp_todo_file="/home/mrinalmriyo/.temptodotasks"
+        for i in "${all_todos[@]}"; do
+                IFS=$name_desc_delim read -ra todo <<< "$i"
+                for((j=0; j<${#todo[*]}; j=j+2))
+                do
+                        if [ "${todo[j]}" != "$1" ]
+                        then
+                                printf "%s%s%s%s" "${todo[j]}$name_desc_delim${todo[j+1]}$todo_delim" >> $temp_todo_file
+			else
+				todo_exists=1
+                        fi
+                done
+        done
+
+	# If the todo removed was the last todo in the list, temp_todo_file would not exist, so check for the condition
+	# and rename it back to todo file iff it exists, this means todo removed was not the last todo
+	if [ -e $temp_todo_file ]
+	then
+		mv $temp_todo_file $todo_file
+	fi
+
+	# If no todo with the same title found prompt the user
+	if [ $todo_exists -eq 0 ]
+	then
+		echo -e "\e[1;31mNo todo with the given title found!\e[0m"
+	else
+		echo -e "\e[1;31mTodo removed!\e[0m"
+	fi
+}
+
+# Help for using the tool
+show_help()
+{
+	echo "Todo tool"
+	echo " "
+	echo "Commands:"
+	printf "\n\t%s %s %s %s \t\t%s\n" "./todo" "--add" "title" "[description]" "Add a task to your todo list"
+	printf "\t%s %s \t\t\t\t\t%s\n" "./todo" "--list" "List all the tasks"
+	printf "\t%s %s %s\t\t\t\t%s\n" "./todo" "--read" "title" "Read description of a todo task"
+	printf "\t%s %s %s\t\t\t\t%s\n" "./todo" "--read" "-a" "Read description of all todo tasks"
+	printf "\t%s %s %s\t\t\t\t%s\n" "./todo" "--remove" "title" "Remove a task from the todo list"
+	printf "\t%s %s \t\t\t\t\t%s\n" "./todo" "--clear" "Clear the todo list"
+	printf "\t%s %s \t\t\t\t\t%s\n" "./todo" "--help" "Show help"
+	printf "\t%s %s \t\t\t\t%s\n" "./todo" "--version" "Show version number"
+}
+
+# Show the version of the tool
+show_version()
+{
+	echo -e "\e[1;37mv1.0\e[0m"
+}
+
+# Switch case to handle all the tasks
+case "$1" in
+	"--add")
+		# Check for validity of the command issued, if command is invalid show help
+		# else check if description was provided and call add_todo accordingly
+	       	if [ $# -le 1 ] || [ $# -gt 3 ]
+		then
+			show_help
+		elif [ $# -eq 3 ]
+		then
+			add_todo "$2" "$3"
+		else
+			add_todo "$2"
+		fi
+		;;
+	"--list")
+		# Check for validity of the command issued, if command is invalid show help
+		# else call_list_todos
+		if [ $# -ne 1 ]
+		then
+			show_help
+		else
+	       		list_todos
+		fi
+		;;
+	"--read") 
+		# Check for validity of the command issued, if command is invalid show help
+		# else check if the -a option was set and call read_todo accordingly
+		if [ $# -ne 2 ]
+		then
+			show_help
+		else
+			if [ "$2" != "-a" ]
+			then
+				read_todo "$2"
+			else
+				read_todo
+			fi
+		fi
+		;;
+	"--clear")
+		# Check for validity of the command issued, if command is invalid show help
+		# else check if todo list exists, if yes confirm regarding the removal of all todos
+		if [ $# -ne 1 ]
+		then
+			show_help
+		else
+			if [ ! -e $todo_file ]
+			then
+				echo -e "\e[1;37mNo todos available!\e[0m"
+			else
+				echo -e "\e[0;31mAre you sure?(y/n)\e[0m"
+				read response
+				if [ response = "y" ] || [ response = "Y" ]
+				then
+					rm .todotasks
+				fi
+			fi
+		fi
+		;;
+	"--remove")
+		# Check for validity of the command issued, if command is invalid show help
+	       	# else call remove_todo to remove the todo from list
+		if [ $# -ne 2 ]
+		then
+			show_help
+		else
+			remove_todo "$2"
+		fi
+		;;
+	"--help") 
+		# Show help
+		show_help
+		;;
+	"--version") 
+		# Check for validity of the command issued, if command is invalid show help
+		# else call show_version
+		if [ $# -ne 1 ]
+		then
+			show_help
+		else
+			show_version
+		fi
+		;;
+	*) 	
+		# If no case matches, show the help for command
+		show_help
+		;;
+esac
