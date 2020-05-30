@@ -8,7 +8,7 @@ name_desc_delim="$"
 todo_delim="&"
 
 # File used to maintain todos
-todo_file="/home/mrinalmriyo/.todotasks"
+todo_file="$HOME/.todotasks"
 
 # Function to add a todo to the list
 add_todo()
