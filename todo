@@ -133,7 +133,7 @@ remove_todo()
 	todos=$(<$todo_file)
         IFS=$todo_delim read -ra all_todos <<< "$todos"
 	rm $todo_file
-	temp_todo_file="/home/mrinalmriyo/.temptodotasks"
+	temp_todo_file="$HOME/.temptodotasks"
         for i in "${all_todos[@]}"; do
                 IFS=$name_desc_delim read -ra todo <<< "$i"
                 for((j=0; j<${#todo[*]}; j=j+2))
